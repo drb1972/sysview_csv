@@ -33,17 +33,32 @@ if (lddIn = 0 | lddOut = 0) then signal inpError       /* input error */
 retC = setOptParm(optParm)                 /* set optional parameters */
 
 /* --- Input read ----------------------------------------------- --- */
-"execio * diskr "ddIn" (stem inputData. finis)"         /* read input */
+/* Original */
+/* "execio * diskr "ddIn" (stem inputData. finis)"          read input */
+/* Modified by Diego */
+   rr = 0
+   input_file  = 'report.txt'
+   do while lines(input_file) \= 0
+    rr = rr+1
+    inputData.rr = linein(input_file)
+   end
+   inputData.0 = rr
 
 /* --- Remove formatting characters ----------------------------- --- */
 /*     - Strip formatting characters (first column) of inputData      */
 /* --- ---------------------------------------------------------- --- */
+
 do i = 1 to inputData.0
-  inputData.i = right(inputData.i,dataLength)   /* strip first column */
+/* Original */
+/*   inputData.i = right(inputData.i,dataLength)    strip first column */
+/* Modified by Diego */
+  parse var inputData.i 1 trash 2 rest
+  inputData.i = rest
 end
 
 /* --- Copy report ---------------------------------------------- --- */
-"execio * diskw rwo (stem inputData. finis)"  /* copy input to output */
+/* Original line commented by Diego */
+/* "execio * diskw rwo (stem inputData. finis)"  copy input to output */
 
 /* --- MAIN PROCESSING ------------------------------------------ --- */
 
@@ -55,7 +70,14 @@ call writeOutput                                 /* create CSV report */
 /* --- FINAL PROCESSING ----------------------------------------- --- */
 
 /* --- Write output --------------------------------------------- --- */
-"execio * diskw "ddOut" (stem outputData. finis)"        /* write CSV */
+/* Original */
+/* "execio * diskw "ddOut" (stem outputData. finis)"  */ /* write CSV */
+/* Modified by Diego */
+output_file = 'csv.txt'
+do rr = 1 to outputData.0
+  call lineout output_file, outputData.rr
+end
+call lineout output_file
 
 
 /* --- EXIT ----------------------------------------------------- --- */
@@ -74,7 +96,7 @@ setOptParm:
  do p = 1 to optParm.0                 /* for all known optinal parms */
    srchString = optParm.p||"="
    position = pos(srchString,optString)     /* parm position in string*/
-   if (position /= 0) then                      /* if parm is present */
+   if (position <> 0) then                      /* if parm is present */
      do                                 /* get it's value - ONE CHAR! */
        parmValue = substr(optParm,position+length(srchString),1)
        changeValue = 'change.'||optParm.p     /* create change notice */
@@ -195,9 +217,9 @@ if (reports = -1) then                            /* no reports found */
     signal cantParse                                         /* error */
   end
 do i = 1 to reports
-  if ((reportStructure.i.reportType /= "TAB") &,/* if other than TAB, */
-      (reportStructure.i.reportType /= "TAB2") &,/* TAB2 or FLASHBACK */
-      (reportStructure.i.reportType /= "FLASHBACK")) then
+  if ((reportStructure.i.reportType <> "TAB") &,/* if other than TAB, */
+      (reportStructure.i.reportType <> "TAB2") &,/* TAB2 or FLASHBACK */
+      (reportStructure.i.reportType <> "FLASHBACK")) then
     do
       say "Report "i" is of a type "reportStructure.i.reportType
       say "This script can parse TAB, TAB2 and FLASHBACK only"
@@ -216,7 +238,7 @@ do i = 1 to inputData.0                              /* for all lines */
     if (word(rpField,3) = "PAGE") then
     do
       commaPos = pos(',',rpField)                   /* Strip comma    */
-      if commaPos ,= 0 then rpField = delstr(rpField,commaPos,1)
+      if commaPos <> 0 then rpField = delstr(rpField,commaPos,1) 
       pageNumber = word(rpField,4)                  /* page of report */
       reportStructure.1.pageNumber = i              /* save page line */
       reportStructure.0 = 1                        /* only one report */
@@ -228,7 +250,7 @@ do i = 1 to inputData.0                              /* for all lines */
     if ((word(rpField,1) = "REPORT") & (word(rpField,3) = "PAGE")) then
     do                                       /* get REPORT-PAGE field */
       commaPos = pos(',',rpField)                   /* Strip comma    */
-      if commaPos ,= 0 then rpField = delstr(rpField,commaPos,1)
+      if commaPos <> 0 then rpField = delstr(rpField,commaPos,1)
       reportNumber = word(rpField,2)              /* number of report */
       pageNumber = word(rpField,4)                  /* page of report */
                               /* store information to reportStructure */
@@ -247,11 +269,11 @@ end
 do i = 1 to reportStructure.0                      /* for all reports */
   do j = 1 to reportStructure.i.0        /* and for all of it's pages */
     line = getLastLine(i,j)                              /* last line */
-      if (line /= -1) then reportStructure.i.j.lastLine = line
+      if (line <> -1) then reportStructure.i.j.lastLine = line
       else signal lastlineNotFound                           /* error */
     delim = getNextDelimiter(reportStructure.i.j,, /* first delimiter */
                              reportStructure.i.j.lastLine)
-      if (delim /= -1) then reportStructure.i.j.firstDelimiter = delim
+      if (delim <> -1) then reportStructure.i.j.firstDelimiter = delim
       else signal delimNotFound                              /* error */
   end
 end
@@ -280,7 +302,7 @@ return 0                                                    /* return */
 /* --- ---------------------------------------------------------- --- */
 isDelimiter:
   arg str
-  if (verify(str,' -') = 0 & pos('-',str) /= 0) then return 1
+  if (verify(str,' -') = 0 & pos('-',str) <> 0) then return 1
   else return 0
 
 /* --- Get next delimiter --------------------------------------- --- */
@@ -307,10 +329,10 @@ getLastLine:
   nextPage = pageN + 1                                   /* next page */
   nextReport = reportN + 1                             /* next report */
   retLine = -1                                        /* return value */
-  if (reportStructure.reportN.nextPage /= 0) then /* before next page */
+  if (reportStructure.reportN.nextPage <> 0) then /* before next page */
     retLine = reportStructure.reportN.nextPage - rpSeparation
   else
-  if (reportStructure.nextReport.1 /= 0) then   /* before next report */
+  if (reportStructure.nextReport.1 <> 0) then   /* before next report */
     retLine = reportStructure.nextReport.1 - rpSeparation
   else
     retLine = getLastDelimiter()                    /* last data line */
